@@ -1,0 +1,41 @@
+def mvnPlugIn(argument) {
+  withMaven(maven: 'maven-3.6.1', mavenSettingsConfig: 'maven-settings') {
+    sh "mvn ${argument}"
+  }
+}
+def downloadVersion(app_name, version) {
+  sh "mvn dependency:get -DremoteRepositories=http://nexus:8081/nexus/content/repositories/releases/ \
+    -DgroupId=com.boxfuse.samples -DartifactId=${app_name} -Dversion=${version} -Dpackaging=war -Ddest=packages/${app_name}.war"
+}
+def deploy(environment, app_name) {
+  mvnPlugIn("install -Pweblogic,${environment},${app_name}")
+}
+
+pipeline {
+  agent any
+  tools {
+    maven 'maven-3.6.1'
+  }
+  parameters {
+    choice(name: 'APP_NAME',    choices: ['hello', 'world'])
+    choice(name: 'ENVIRONMENT', choices: ['ft1', 'ft2'])
+    string(name: 'BUILD_NAMBA', defaultValue: '1.0.34')
+  }
+  stages {
+    stage('Prepare') {
+      steps {
+        sh 'mkdir -p packages'
+      }
+    }
+    stage('Get version') {
+      steps {
+        downloadVersion(params.APP_NAME, params.BUILD_NAMBA)
+      }
+    }
+    stage('Deploy') {
+      steps {
+        deploy(params.ENVIRONMENT, params.APP_NAME)
+      }
+    }
+  }
+}
